@@ -18,6 +18,19 @@ export const users = pgTable("users", {
     .defaultNow(),
 });
 
+export const workspaceAccess = pgTable("workspace_access", {
+  email: text("email").primaryKey(),
+  status: text("status", { enum: ["invited", "active", "revoked"] }).notNull().default("invited"),
+  invitationId: text("invitation_id"),
+  expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }).notNull(),
+  createdAt: createdAt(),
+});
+
+export const workspaceSettings = pgTable("workspace_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});
+
 export const tasks = pgTable(
   "tasks",
   {

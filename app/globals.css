@@ -19,6 +19,18 @@
   --shadow: 0 14px 40px rgba(23, 33, 31, 0.08);
 }
 
+.form-error { color: #b42318 !important; background: #fff2ef; border-radius: 10px; padding: 12px; }
+.signout-button { color: #c7f46a; font-size: 10px; }
+.invitation-settings { margin-top: 28px; padding: 24px; background: white; border: 1px solid var(--line); border-radius: 14px; }
+.invite-form { display: flex; gap: 12px; flex-wrap: wrap; }
+.invite-form input { flex: 1; min-width: 200px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
+.invite-message { font-size: 13px; line-height: 1.5; color: var(--ink-soft); }
+.access-row { display: flex; align-items: center; gap: 16px; padding: 16px 0; border-top: 1px solid var(--line); font-size: 12px; }
+.access-row > span:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.access-row small { display: block; margin-top: 4px; color: var(--muted); }
+.access-status { color: var(--muted); text-transform: capitalize; }
+.access-list { margin-top: 20px; }
+
 * { box-sizing: border-box; }
 html { background: var(--canvas); }
 body { margin: 0; background: var(--canvas); color: var(--ink); font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }

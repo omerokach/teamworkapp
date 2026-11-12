@@ -33,6 +33,14 @@ export async function getDb() {
 }
 
 async function initializeSchema(db: RelayDatabase) {
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS workspace_access (
+    email text PRIMARY KEY, status text NOT NULL DEFAULT 'invited',
+    invitation_id text, expires_at timestamptz NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS workspace_settings (
+    key text PRIMARY KEY, value text NOT NULL
+  )`);
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS users (
       id text PRIMARY KEY,

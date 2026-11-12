@@ -9,6 +9,7 @@ not disappear inside chat threads.
 - Next.js 16 and React 19
 - Drizzle ORM
 - Neon serverless Postgres
+- Neon Auth for verified email sign-in and invitation emails
 - Vercel hosting
 
 ## Local setup
@@ -38,7 +39,14 @@ migration workflow.
 4. Open the production URL once; RelayDesk initializes the empty database and
    creates the starter workspace.
 
-The app is intentionally passwordless. A visitor chooses a display name, and
-the browser remembers a generated guest ID. Anyone who has the production link
-can read and change the shared workspace, so do not store confidential data in
-this version.
+Access is invitation-only. Set `RELAYDESK_OWNER_EMAIL` in Vercel to the owner's
+email address, `NEON_AUTH_BASE_URL` to the project's Auth URL, and
+`NEON_AUTH_COOKIE_SECRET` to a cryptographically random value of at least 32
+characters. Keep the secret in Vercel's secret environment variables.
+
+In Neon Auth settings, trust the app's production URL, require email verification,
+and enable organization invitation emails. The owner signs in with an email
+code, chooses a name, and invites partners from Team. Invited partners verify
+their email, choose a name, and share the board with their own My tasks view.
+Only the owner can send invitations or revoke access. Revocation is checked on
+every app API request. Legacy guest identity headers are no longer accepted.

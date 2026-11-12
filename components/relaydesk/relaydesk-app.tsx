@@ -1,5 +1,7 @@
 "use client";
 
+import Invitations from "./invitations";
+
 import {
   Activity,
   ArrowRight,
@@ -150,7 +152,7 @@ function displayFirstName(name: string) {
   return first.includes("@") ? first.split("@")[0] : first;
 }
 
-export default function RelayDeskApp({ sessionUser }: { sessionUser: SessionUser }) {
+export default function RelayDeskApp({ sessionUser, isAdmin, onSignOut }: { sessionUser: SessionUser; isAdmin: boolean; onSignOut: () => void }) {
   const [data, setData] = useState<AppData | null>(null);
   const [activeView, setActiveView] = useState<View>("dashboard");
   const [search, setSearch] = useState("");
@@ -163,26 +165,17 @@ export default function RelayDeskApp({ sessionUser }: { sessionUser: SessionUser
   const [copied, setCopied] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  const identityHeaders = useMemo(
-    () => ({
-      "x-relaydesk-guest-id": sessionUser.id,
-      "x-relaydesk-guest-name": encodeURIComponent(sessionUser.displayName),
-    }),
-    [sessionUser.displayName, sessionUser.id],
-  );
-
   const refresh = useCallback(async (showLoader = false) => {
     if (showLoader) setLoading(true);
     const response = await fetch("/api/state", {
       cache: "no-store",
-      headers: identityHeaders,
     });
     const payload = (await response.json()) as AppData & { error?: string };
     if (!response.ok) throw new Error(payload.error || "Could not load the workspace.");
     setData(payload);
     setError(null);
     setLoading(false);
-  }, [identityHeaders]);
+  }, []);
 
   useEffect(() => {
     refresh(true).catch((reason) => {
@@ -240,7 +233,7 @@ export default function RelayDeskApp({ sessionUser }: { sessionUser: SessionUser
   async function requestJson(url: string, init: RequestInit, successMessage: string) {
     const response = await fetch(url, {
       ...init,
-      headers: { "Content-Type": "application/json", ...identityHeaders },
+      headers: { "Content-Type": "application/json" },
     });
     const payload = (await response.json()) as { error?: string };
     if (!response.ok) throw new Error(payload.error || "That change could not be saved.");
@@ -427,7 +420,7 @@ export default function RelayDeskApp({ sessionUser }: { sessionUser: SessionUser
         <div className="profile-row">
           <Avatar member={currentMember ?? sessionUser} size="medium" />
           <span><strong>{currentMember?.displayName ?? sessionUser.displayName}</strong><small>Online</small></span>
-          <MoreHorizontal size={18} aria-hidden="true" />
+          <button className="text-button signout-button" onClick={onSignOut}>Sign out</button>
         </div>
       </aside>
 
@@ -483,7 +476,7 @@ export default function RelayDeskApp({ sessionUser }: { sessionUser: SessionUser
                   {activeView === "dashboard" && "Here’s what needs attention across the team."}
                   {activeView === "my_tasks" && "Everything assigned to you, without the chat scroll."}
                   {activeView === "decisions" && "Record the why once, then keep everyone aligned."}
-                  {activeView === "team" && "Partners appear here after opening the link and choosing a name."}
+                  {activeView === "team" && "Your invited partners, connected to one shared workspace."}
                 </p>
               </div>
               {activeView === "decisions" && (
@@ -530,7 +523,7 @@ export default function RelayDeskApp({ sessionUser }: { sessionUser: SessionUser
               <DecisionList decisions={data.decisions} membersById={membersById} onNew={() => setShowDecisionModal(true)} />
             )}
             {activeView === "team" && (
-              <TeamView members={data.members} currentUserId={data.currentUserId} onCopy={copyWorkspaceLink} />
+              <><TeamView members={data.members} currentUserId={data.currentUserId} onCopy={copyWorkspaceLink} />{isAdmin && <Invitations />}</>
             )}
           </main>
 
@@ -674,10 +667,9 @@ function DecisionList({ decisions, membersById, onNew }: { decisions: Decision[]
 function TeamView({ members, currentUserId, onCopy }: { members: Member[]; currentUserId: string; onCopy: () => void }) {
   return (
     <section>
-      <div className="invite-banner"><div className="invite-visual"><UsersRound size={25} /><span><Plus size={13} /></span></div><div><p className="eyebrow">Build the shared habit</p><h2>Bring your partners into one workspace</h2><p>Send them the app link. No account is needed—they choose a name and enter the shared workspace.</p></div><button className="button light" onClick={onCopy}><Copy size={17} />Copy link</button></div>
+      <div className="invite-banner"><div className="invite-visual"><UsersRound size={25} /><span><Plus size={13} /></span></div><div><p className="eyebrow">One shared team</p><h2>Your team, always in sync</h2><p>Access is by email invitation from the workspace owner. Your account and assigned tasks follow you across devices.</p></div><button className="button light" onClick={onCopy}><Copy size={17} />Copy app link</button></div>
       <div className="team-grid">
         {members.map((member) => <article className="member-card" key={member.id}><Avatar member={member} size="large" /><div><h3>{member.displayName}{member.id === currentUserId && <span>You</span>}</h3><p>{member.email.endsWith("@relaydesk.local") ? "Guest member" : member.email}</p></div><span className="online-status"><i />Active</span></article>)}
-        <button className="member-card invite-card" onClick={onCopy}><span className="invite-circle"><Plus size={21} /></span><div><h3>Invite a partner</h3><p>Copy the workspace link</p></div></button>
       </div>
     </section>
   );

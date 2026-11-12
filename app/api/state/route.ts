@@ -30,7 +30,7 @@ export async function GET() {
             id: "starter-invite-team",
             title: "Invite your partners to RelayDesk",
             description:
-              "Share the public app link so everyone works from the same source of truth. No account or password is required.",
+              "Open Team and invite your partners by email. They verify their address and choose their own name.",
             status: "in_progress",
             priority: "high",
             assigneeId: user.userId,
@@ -89,6 +89,7 @@ export async function GET() {
 
     return Response.json({
       currentUserId: user.userId,
+      isAdmin: context.isAdmin,
       members: memberRows,
       tasks: taskRows,
       comments: commentRows,
