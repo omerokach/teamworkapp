@@ -18,6 +18,7 @@ import {
   LayoutDashboard,
   ListChecks,
   Loader2,
+  LogOut,
   MessageCircle,
   MoreHorizontal,
   Plus,
@@ -353,6 +354,7 @@ export default function RelayDeskApp({ sessionUser, isAdmin, onSignOut }: { sess
         <h1>We couldn’t open the workspace.</h1>
         <p>{error || "The workspace is temporarily unavailable."}</p>
         <button className="button primary" onClick={() => refresh(true)}>Try again</button>
+        <button className="button ghost" onClick={onSignOut}>Sign in again</button>
       </div>
     );
   }
@@ -441,6 +443,7 @@ export default function RelayDeskApp({ sessionUser, isAdmin, onSignOut }: { sess
             <kbd>⌘ K</kbd>
           </div>
           <div className="topbar-actions">
+            <button className="icon-button" onClick={onSignOut} aria-label="Sign out"><LogOut size={18} /></button>
             <button className="icon-button" aria-label="Notifications">
               <Bell size={19} /><span className="notification-dot" />
             </button>

@@ -1,4 +1,5 @@
-import { asc, desc } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
+import { ownerEmail } from "../../../lib/access";
 import { getApiContext, apiError, unauthorized } from "../../../lib/api-context";
 import {
   activities,
@@ -6,6 +7,7 @@ import {
   decisions,
   tasks,
   users,
+  workspaceAccess,
 } from "../../../db/schema";
 
 export const dynamic = "force-dynamic";
@@ -71,7 +73,14 @@ export async function GET() {
         .onConflictDoNothing();
     }
 
-    const memberRows = await db.select().from(users).orderBy(asc(users.createdAt));
+    await db.update(tasks).set({ description: "Open Team and invite your partners by email. They verify their address and choose their own name." }).where(and(
+      eq(tasks.id, "starter-invite-team"),
+      eq(tasks.description, "Share the public app link so everyone works from the same source of truth. No account or password is required."),
+    ));
+    const memberRows = await db.select().from(users).where(or(
+      eq(users.email, ownerEmail()),
+      inArray(users.email, db.select({ email: workspaceAccess.email }).from(workspaceAccess).where(eq(workspaceAccess.status, "active"))),
+    )).orderBy(asc(users.createdAt));
     const taskRows = await db.select().from(tasks).orderBy(desc(tasks.updatedAt));
     const commentRows = await db
       .select()
