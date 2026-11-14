@@ -128,6 +128,17 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .column-cards { display: flex; min-height: 140px; flex-direction: column; gap: 8px; }
 .task-card { width: 100%; padding: 12px; border: 1px solid #e2e7e4; border-radius: 11px; background: white; text-align: left; box-shadow: 0 2px 7px rgba(23,33,31,.04); cursor: pointer; transition: .18s ease; }
 .task-card:hover { transform: translateY(-2px); border-color: #cfd7d3; box-shadow: 0 9px 20px rgba(23,33,31,.08); }
+.board-drag-hint { margin: 0 0 10px; color: var(--muted); font-size: 10px; }
+.task-card-open { display: block; width: 100%; padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.task-card-open > p { display: -webkit-box; overflow: hidden; margin: 0 0 12px; color: #7c8884; font-size: 9px; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.task-drag-handle { display: grid; width: 30px; height: 30px; margin: -6px -5px -6px 0; place-items: center; border: 0; border-radius: 6px; color: #7c8884; background: transparent; cursor: grab; touch-action: none; }
+.task-drag-handle:hover { background: #edf1ef; color: var(--ink); }
+.task-drag-handle:active { cursor: grabbing; }
+.task-drag-handle:disabled { opacity: .45; cursor: wait; }
+.task-card.dragging { opacity: .3; }
+.task-card.saving { border-color: #9ed843; }
+.task-card.drag-preview { cursor: grabbing; box-shadow: 0 14px 32px rgba(23,33,31,.2); transform: rotate(2deg); }
+.kanban-column.drop-target { border-color: #8db944; background: #e4efda; box-shadow: inset 0 0 0 2px #b4d97f; }
 .task-card-top { display: flex; align-items: center; justify-content: space-between; }
 .task-card-top > svg { color: #a1aaa7; }
 .priority { display: inline-flex; align-items: center; gap: 5px; color: #697672; font-size: 8px; font-weight: 780; letter-spacing: .07em; text-transform: uppercase; }

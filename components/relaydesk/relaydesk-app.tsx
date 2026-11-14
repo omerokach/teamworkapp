@@ -1,6 +1,11 @@
 "use client";
 
 import Invitations from "./invitations";
+import {
+  DndContext, DragOverlay, KeyboardSensor, PointerSensor,
+  pointerWithin, rectIntersection, useDraggable, useDroppable, useSensor, useSensors,
+  type CollisionDetection, type KeyboardCoordinateGetter,
+} from "@dnd-kit/core";
 
 import {
   Activity,
@@ -14,13 +19,13 @@ import {
   ClipboardList,
   Copy,
   Flag,
+  GripVertical,
   Inbox,
   LayoutDashboard,
   ListChecks,
   Loader2,
   LogOut,
   MessageCircle,
-  MoreHorizontal,
   Plus,
   Search,
   Send,
@@ -165,6 +170,7 @@ export default function RelayDeskApp({ sessionUser, isAdmin, onSignOut }: { sess
   const [showDecisionModal, setShowDecisionModal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [movingTaskId, setMovingTaskId] = useState<string | null>(null);
 
   const refresh = useCallback(async (showLoader = false) => {
     if (showLoader) setLoading(true);
@@ -285,6 +291,31 @@ export default function RelayDeskApp({ sessionUser, isAdmin, onSignOut }: { sess
       setToast(reason instanceof Error ? reason.message : "Could not update the task.");
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function moveTask(taskId: string, status: TaskStatus) {
+    const task = data?.tasks.find(item => item.id === taskId);
+    if (!task || task.status === status || movingTaskId || busy) return;
+    const previousStatus = task.status;
+    setMovingTaskId(taskId);
+    setData(current => current ? { ...current, tasks: current.tasks.map(item => item.id === taskId ? { ...item, status } : item) } : current);
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }),
+      });
+      const payload = await response.json() as { task?: Task; error?: string };
+      if (!response.ok || !payload.task) throw new Error(payload.error || "Could not move the task.");
+      const savedTask = payload.task;
+      setData(current => current ? { ...current, tasks: current.tasks.map(item => item.id === taskId ? savedTask : item) } : current);
+      setToast(`Moved to ${columns.find(column => column.status === status)?.label}`);
+      // Refresh activity without undoing a successfully saved move if this read fails.
+      await refresh().catch(() => {});
+    } catch (reason) {
+      setData(current => current ? { ...current, tasks: current.tasks.map(item => item.id === taskId ? { ...item, status: previousStatus } : item) } : current);
+      setToast(reason instanceof Error ? reason.message : "Could not move the task. Please try again.");
+    } finally {
+      setMovingTaskId(null);
     }
   }
 
@@ -507,7 +538,7 @@ export default function RelayDeskApp({ sessionUser, isAdmin, onSignOut }: { sess
                     <div><h2>Team board</h2><p>Every task has an owner, a status, and its conversation.</p></div>
                     <button className="text-button" onClick={() => setActiveView("my_tasks")}>View my tasks <ArrowRight size={15} /></button>
                   </div>
-                  <TaskBoard tasks={filteredTasks} comments={data.comments} membersById={membersById} onSelect={setSelectedTaskId} onNew={() => setShowTaskModal(true)} />
+                  <TaskBoard tasks={filteredTasks} comments={data.comments} membersById={membersById} onSelect={setSelectedTaskId} onNew={() => setShowTaskModal(true)} onMove={moveTask} disabled={!!movingTaskId || !!busy} movingTaskId={movingTaskId} />
                 </section>
               </>
             )}
@@ -518,7 +549,7 @@ export default function RelayDeskApp({ sessionUser, isAdmin, onSignOut }: { sess
                   <div><h2>{filteredTasks.length} assigned tasks</h2><p>Focus on active work first; completed items stay visible for context.</p></div>
                   <button className="button secondary" onClick={() => setShowTaskModal(true)}><Plus size={17} />Add task</button>
                 </div>
-                <TaskBoard tasks={filteredTasks} comments={data.comments} membersById={membersById} onSelect={setSelectedTaskId} onNew={() => setShowTaskModal(true)} />
+                <TaskBoard tasks={filteredTasks} comments={data.comments} membersById={membersById} onSelect={setSelectedTaskId} onNew={() => setShowTaskModal(true)} onMove={moveTask} disabled={!!movingTaskId || !!busy} movingTaskId={movingTaskId} />
               </section>
             )}
 
@@ -601,7 +632,7 @@ export default function RelayDeskApp({ sessionUser, isAdmin, onSignOut }: { sess
           membersById={membersById}
           currentUserId={data.currentUserId}
           comments={data.comments.filter((comment) => comment.taskId === selectedTask.id)}
-          busy={busy === `task-${selectedTask.id}` || busy === `comment-${selectedTask.id}`}
+          busy={busy === `task-${selectedTask.id}` || busy === `comment-${selectedTask.id}` || !!movingTaskId}
           onClose={() => setSelectedTaskId(null)}
           onUpdate={(updates) => updateTask(selectedTask.id, updates)}
           onComment={addComment}
@@ -622,35 +653,82 @@ function MetricCard({ label, value, detail, icon: Icon, tone }: { label: string;
   return <article className="metric-card"><div className={`metric-icon ${tone}`}><Icon size={18} /></div><span>{label}</span><strong>{value}</strong><small>{detail}</small></article>;
 }
 
-function TaskBoard({ tasks, comments, membersById, onSelect, onNew }: { tasks: Task[]; comments: Comment[]; membersById: Map<string, Member>; onSelect: (id: string) => void; onNew: () => void }) {
+const stageCollision: CollisionDetection = (args) => {
+  // Pointer drops outside the board cancel instead of choosing the nearest stage.
+  return args.pointerCoordinates ? pointerWithin(args) : rectIntersection(args);
+};
+
+const stageKeyboardCoordinates: KeyboardCoordinateGetter = (event, { context, currentCoordinates }) => {
+  if (event.code !== "ArrowLeft" && event.code !== "ArrowRight") return;
+  event.preventDefault();
+  const currentStage = context.over?.id ?? context.active?.data.current?.status;
+  const index = columns.findIndex(column => column.status === currentStage);
+  const next = columns[index + (event.code === "ArrowRight" ? 1 : -1)];
+  if (!next || !context.collisionRect) return currentCoordinates;
+  const rect = context.droppableRects.get(next.status);
+  if (!rect) return currentCoordinates;
+  return { x: currentCoordinates.x + rect.left + rect.width / 2 - context.collisionRect.left - context.collisionRect.width / 2, y: currentCoordinates.y + rect.top + 60 - context.collisionRect.top };
+};
+
+function TaskBoard({ tasks, comments, membersById, onSelect, onNew, onMove, disabled, movingTaskId }: { tasks: Task[]; comments: Comment[]; membersById: Map<string, Member>; onSelect: (id: string) => void; onNew: () => void; onMove: (id: string, status: TaskStatus) => Promise<void>; disabled: boolean; movingTaskId: string | null }) {
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: stageKeyboardCoordinates }),
+  );
+  const draggedTask = tasks.find(task => task.id === draggedId);
   return (
-    <div className="board-scroll"><div className="kanban-board">
+    <DndContext sensors={sensors} collisionDetection={stageCollision}
+      accessibility={{ screenReaderInstructions: { draggable: "Press Space or Enter to pick up this task, Left or Right to choose a stage, and Space or Enter to drop. Press Escape to cancel." } }}
+      onDragStart={({ active }) => setDraggedId(String(active.id))}
+      onDragCancel={() => setDraggedId(null)}
+      onDragEnd={({ active, over }) => {
+        setDraggedId(null);
+        const stage = columns.find(column => column.status === over?.id);
+        if (stage && !disabled) void onMove(String(active.id), stage.status);
+      }}>
+    <p className="board-drag-hint">Drag cards between stages. On touch screens, use the grip.</p>
+    <div className="board-scroll"><div className="kanban-board" aria-busy={!!movingTaskId}>
       {columns.map((column) => {
         const Icon = column.icon;
         const columnTasks = tasks.filter((task) => task.status === column.status);
         return (
-          <section className="kanban-column" key={column.status}>
+          <TaskStage status={column.status} key={column.status}>
             <header><span className={`column-icon ${column.tone}`}><Icon size={15} /></span><h3>{column.label}</h3><em>{columnTasks.length}</em><button onClick={onNew} aria-label={`Add task to ${column.label}`}><Plus size={16} /></button></header>
             <div className="column-cards">
               {columnTasks.map((task) => {
                 const assignee = task.assigneeId ? membersById.get(task.assigneeId) : undefined;
                 const commentCount = comments.filter((comment) => comment.taskId === task.id).length;
                 return (
-                  <button className="task-card" key={task.id} onClick={() => onSelect(task.id)}>
-                    <div className="task-card-top"><span className={`priority ${task.priority}`}><i />{task.priority}</span><MoreHorizontal size={17} aria-hidden="true" /></div>
-                    <h4>{task.title}</h4>
-                    {task.description && <p>{task.description}</p>}
-                    <div className="task-meta"><span className={task.dueDate ? "" : "muted"}><CalendarDays size={14} />{task.dueDate ? formatDate(task.dueDate, true) : "No date"}</span>{commentCount > 0 && <span><MessageCircle size={14} />{commentCount}</span>}<Avatar member={assignee} size="small" /></div>
-                  </button>
+                  <DraggableTask key={task.id} task={task} assignee={assignee} commentCount={commentCount} onSelect={onSelect} disabled={disabled} saving={movingTaskId === task.id} />
                 );
               })}
               {columnTasks.length === 0 && <button className="empty-column" onClick={onNew}><Plus size={16} />Add a task</button>}
             </div>
-          </section>
+          </TaskStage>
         );
       })}
     </div></div>
+    <DragOverlay dropAnimation={null}>{draggedTask ? <div className="task-card drag-preview"><span className={`priority ${draggedTask.priority}`}><i />{draggedTask.priority}</span><h4>{draggedTask.title}</h4></div> : null}</DragOverlay>
+    </DndContext>
   );
+}
+
+function TaskStage({ status, children }: { status: TaskStatus; children: ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: status });
+  return <section ref={setNodeRef} className={`kanban-column${isOver ? " drop-target" : ""}`} aria-label={`${columns.find(column => column.status === status)?.label} stage`}>{children}</section>;
+}
+
+function DraggableTask({ task, assignee, commentCount, onSelect, disabled, saving }: { task: Task; assignee?: Member; commentCount: number; onSelect: (id: string) => void; disabled: boolean; saving: boolean }) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } = useDraggable({ id: task.id, data: { status: task.status }, disabled });
+  return <article ref={setNodeRef} onPointerDown={event => listeners?.onPointerDown?.(event)} className={`task-card${isDragging ? " dragging" : ""}${saving ? " saving" : ""}`}>
+    <div className="task-card-top"><span className={`priority ${task.priority}`}><i />{task.priority}</span><button type="button" ref={setActivatorNodeRef} {...attributes} onKeyDown={event => listeners?.onKeyDown?.(event)} className="task-drag-handle" disabled={disabled} aria-label={`Drag ${task.title} to another stage`} title="Drag to move; keyboard: Space, then Left or Right, then Space">{saving ? <Loader2 size={17} className="spin" /> : <GripVertical size={17} />}</button></div>
+    <button className="task-card-open" type="button" onClick={() => onSelect(task.id)}>
+      <h4>{task.title}</h4>
+      {task.description && <p>{task.description}</p>}
+      <div className="task-meta"><span className={task.dueDate ? "" : "muted"}><CalendarDays size={14} />{task.dueDate ? formatDate(task.dueDate, true) : "No date"}</span>{commentCount > 0 && <span><MessageCircle size={14} />{commentCount}</span>}<Avatar member={assignee} size="small" /></div>
+    </button>
+  </article>;
 }
 
 function DecisionList({ decisions, membersById, onNew }: { decisions: Decision[]; membersById: Map<string, Member>; onNew: () => void }) {
