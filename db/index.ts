@@ -108,6 +108,14 @@ async function initializeSchema(db: RelayDatabase) {
   `);
 
   await db.execute(sql`CREATE INDEX IF NOT EXISTS tasks_status_idx ON tasks(status)`);
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS thoughts (
+    id text PRIMARY KEY,
+    body text NOT NULL,
+    notes text NOT NULL DEFAULT '',
+    author_id text NOT NULL REFERENCES users(id),
+    discussed_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS tasks_assignee_idx ON tasks(assignee_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS comments_task_idx ON comments(task_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS activities_created_idx ON activities(created_at)`);

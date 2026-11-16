@@ -1,6 +1,7 @@
 "use client";
 
 import Invitations from "./invitations";
+import Thoughts from "./thoughts";
 import {
   DndContext, DragOverlay, KeyboardSensor, PointerSensor,
   pointerWithin, rectIntersection, useDraggable, useDroppable, useSensor, useSensors,
@@ -23,6 +24,7 @@ import {
   Inbox,
   LayoutDashboard,
   ListChecks,
+  Lightbulb,
   Loader2,
   LogOut,
   MessageCircle,
@@ -42,7 +44,7 @@ import {
   useState,
 } from "react";
 
-type View = "dashboard" | "my_tasks" | "decisions" | "team";
+type View = "dashboard" | "my_tasks" | "thoughts" | "decisions" | "team";
 type TaskStatus = "backlog" | "in_progress" | "review" | "done";
 type Priority = "low" | "medium" | "high";
 
@@ -106,6 +108,7 @@ const columns: Array<{
 const navItems: Array<{ id: View; label: string; icon: typeof Inbox }> = [
   { id: "dashboard", label: "Overview", icon: LayoutDashboard },
   { id: "my_tasks", label: "My tasks", icon: ListChecks },
+  { id: "thoughts", label: "Thoughts", icon: Lightbulb },
   { id: "decisions", label: "Decisions", icon: ClipboardList },
   { id: "team", label: "Team", icon: UsersRound },
 ];
@@ -409,7 +412,7 @@ export default function RelayDeskApp({ sessionUser, isAdmin, onSignOut }: { sess
 
         <nav aria-label="Primary navigation">
           <p className="nav-label">Work</p>
-          {navItems.slice(0, 3).map((item) => {
+          {navItems.filter(item => item.id !== "team").map((item) => {
             const Icon = item.icon;
             return (
               <button
@@ -427,7 +430,7 @@ export default function RelayDeskApp({ sessionUser, isAdmin, onSignOut }: { sess
             );
           })}
           <p className="nav-label people-label">People</p>
-          {navItems.slice(3).map((item) => {
+          {navItems.filter(item => item.id === "team").map((item) => {
             const Icon = item.icon;
             return (
               <button
@@ -468,8 +471,8 @@ export default function RelayDeskApp({ sessionUser, isAdmin, onSignOut }: { sess
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search tasks and people…"
-              aria-label="Search tasks and people"
+              placeholder={activeView === "thoughts" ? "Search thoughts and notes…" : "Search tasks and people…"}
+              aria-label={activeView === "thoughts" ? "Search thoughts and notes" : "Search tasks and people"}
             />
             <kbd>⌘ K</kbd>
           </div>
@@ -503,12 +506,14 @@ export default function RelayDeskApp({ sessionUser, isAdmin, onSignOut }: { sess
                 <h1>
                   {activeView === "dashboard" && `Welcome back, ${firstName}`}
                   {activeView === "my_tasks" && "Your work, one clear list"}
+                  {activeView === "thoughts" && "A place for your thoughts"}
                   {activeView === "decisions" && "Decisions your team can find"}
                   {activeView === "team" && "The people moving work forward"}
                 </h1>
                 <p>
                   {activeView === "dashboard" && "Here’s what needs attention across the team."}
                   {activeView === "my_tasks" && "Everything assigned to you, without the chat scroll."}
+                  {activeView === "thoughts" && "Capture ideas, talk them through, and keep what you learned."}
                   {activeView === "decisions" && "Record the why once, then keep everyone aligned."}
                   {activeView === "team" && "Your invited partners, connected to one shared workspace."}
                 </p>
@@ -553,6 +558,7 @@ export default function RelayDeskApp({ sessionUser, isAdmin, onSignOut }: { sess
               </section>
             )}
 
+            {activeView === "thoughts" && <Thoughts currentUserId={data.currentUserId} isAdmin={isAdmin} search={search} />}
             {activeView === "decisions" && (
               <DecisionList decisions={data.decisions} membersById={membersById} onNew={() => setShowDecisionModal(true)} />
             )}

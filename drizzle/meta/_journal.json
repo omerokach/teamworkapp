@@ -15,6 +15,13 @@
       "when": 1794497917465,
       "tag": "0001_legal_sphinx",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794832489093,
+      "tag": "0002_modern_deadpool",
+      "breakpoints": true
     }
   ]
 }

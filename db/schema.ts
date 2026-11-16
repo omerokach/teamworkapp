@@ -92,6 +92,15 @@ export const decisions = pgTable("decisions", {
   createdAt: createdAt(),
 });
 
+export const thoughts = pgTable("thoughts", {
+  id: text("id").primaryKey(),
+  body: text("body").notNull(),
+  notes: text("notes").notNull().default(""),
+  authorId: text("author_id").notNull().references(() => users.id),
+  discussedAt: timestamp("discussed_at", { withTimezone: true, mode: "string" }),
+  createdAt: createdAt(),
+});
+
 export const activities = pgTable(
   "activities",
   {
